@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 rocket = "0.5.0"
 sqlx = { version = "0.7", features = [ "runtime-tokio", "tls-native-tls" , "postgres"] }
+anyhow = { version = "1.0", default-features = false }
+bcrypt = "0.15"
 
 
 [profile.dev.package.sqlx-macros]
