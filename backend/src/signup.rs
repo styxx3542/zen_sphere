@@ -1,14 +1,14 @@
-use rocket::form::{Form, Strict};
 use sqlx;
 use anyhow::{anyhow, Result};
 use bcrypt;
+use serde::{Deserialize, Serialize};
 struct Password {
     value: String,
 }
 
 
 
- type EncryptedPassword = String;
+type EncryptedPassword = String;
 impl Password {
     fn new(value: String) -> Self {
         Self { value }
@@ -50,6 +50,8 @@ impl Password {
         Ok(bcrypt::hash(password, 12).map_err(anyhow::Error::msg)?)
     }
 }
+
+#[derive(Serialize, Deserialize)]
 struct Username {
     value: String,
 }
@@ -66,7 +68,39 @@ async fn is_username_unique(pool: &sqlx::PgPool, username: &str) -> Result<bool>
 
     Ok(count == Some(0))
 }
-    async fn validate(&self, pool: &sqlx::PgPool) -> bool {
-        Self::is_username_unique(&pool, &self.value).await.expect("Failed to check if username is unique")
+    async fn validate(&self, pool: &sqlx::PgPool) -> Result<bool>{
+        Ok(Self::is_username_unique(&pool, &self.value).await?)
     }
 }
+
+fn validate_email(email:&str) -> bool {
+    //todo - implement this
+    true
+}
+#[derive(FromForm)]
+pub struct SignupForm {
+    pub username: String,
+    pub password: String,
+    pub email: String,
+}
+
+pub async fn signup(username: &str, password: &str,email: &str, pool: &sqlx::PgPool) -> Result<()> {
+    let username = Username::new(username.to_string());
+    if !username.validate(pool).await? {
+        return Err(anyhow!("Username is not unique"));
+    }
+    if !validate_email(email){
+        return Err(anyhow!("Email is not valid"));
+    }
+    let password_hash = Password::build_password(password.to_string())?;
+    sqlx::query!(
+        "INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3)",
+        username.value,
+        password_hash,
+        email
+    ).execute(pool).await.map_err(anyhow::Error::msg)?;
+    Ok(()) 
+}
+
+
+
